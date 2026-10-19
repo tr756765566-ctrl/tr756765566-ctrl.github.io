@@ -296,6 +296,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:32%;right:32%;heig
 .go:disabled{opacity:.65}
 #auth button:focus-visible,#auth input:focus-visible{outline:3px solid var(--cy);outline-offset:2px}
 @media(prefers-reduced-motion:reduce){.spn{animation:none}}
+.soc.on{opacity:1;filter:none;cursor:pointer;box-shadow:0 3px 0 #b9c4dc}.soc.on:active{transform:translateY(2px);box-shadow:0 1px 0 #b9c4dc}
 </style>
 </head>
 <body>
@@ -352,7 +353,7 @@ nav button.on::before{content:"";position:absolute;top:0;left:32%;right:32%;heig
   <div class="ah"><div class="lhero" id="afan" aria-hidden="true"></div><h1 dir="ltr">Fazza Majlis</h1><p>مرحباً بك — سجّل دخولك لتبدأ اللعب</p></div>
   <div id="aldg"><div class="spn"></div><p id="aldm" style="margin:0">جارٍ التحميل…</p><button class="btn s" id="aretry" type="button" hidden>إعادة المحاولة</button></div>
   <div class="aform">
-    <button class="soc gp" type="button" disabled aria-disabled="true"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4.5 2.8 12.2 12 4.5 21.2z" fill="#00b0ff"/><path d="M4.5 2.8 16.2 9.9 12.2 12z" fill="#32d74b"/><path d="M4.5 21.2 16.2 14.1 12.2 12z" fill="#ff3b30"/><path d="M16.2 9.9 20.5 12l-4.3 2.1-4-2.1z" fill="#ffd60a"/></svg><span>المتابعة عبر Google Play</span><small>قريباً</small></button>
+    <button class="soc gp on" id="agoogle" type="button"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.4 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4 7.1-10 7.1-17.5z"/><path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.8 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg><span>المتابعة عبر Google</span></button>
     <button class="soc fb" type="button" disabled aria-disabled="true"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#fff"/><path d="M13.4 20v-6.6h2.2l.4-2.7h-2.6V9c0-.8.3-1.3 1.4-1.3H16V5.3c-.2 0-1.1-.1-2-.1-2 0-3.4 1.2-3.4 3.5v2H8.2v2.7h2.4V20z" fill="#1877f2"/></svg><span>المتابعة عبر فيسبوك</span><small>قريباً</small></button>
     <div class="adv">أو بالبريد الإلكتروني</div>
     <div class="aseg"><button type="button" data-m="in" class="on">تسجيل الدخول</button><button type="button" data-m="up">إنشاء حساب</button></div>
@@ -826,7 +827,7 @@ $('#lx').onclick=()=>{$('#cf').hidden=false};
 $('#lsg').onclick=()=>{mute=!mute;$('#lsg').textContent=$('#gg').textContent=mute?'🔇':'🔊';toast(mute?'الصوت متوقف':'الصوت يعمل')};
 /* ===== تسجيل الدخول (Firebase) ===== */
 const AU={m:'in',busy:false};
-const AERR={'auth/email-already-in-use':'هذا البريد مسجّل مسبقاً، جرّب تسجيل الدخول','auth/invalid-email':'صيغة البريد الإلكتروني غير صحيحة','auth/weak-password':'كلمة المرور ضعيفة (6 أحرف على الأقل)','auth/user-not-found':'البريد أو كلمة المرور غير صحيحة','auth/wrong-password':'البريد أو كلمة المرور غير صحيحة','auth/invalid-credential':'البريد أو كلمة المرور غير صحيحة','auth/invalid-login-credentials':'البريد أو كلمة المرور غير صحيحة','auth/too-many-requests':'محاولات كثيرة، حاول بعد قليل','auth/network-request-failed':'تعذّر الاتصال بالإنترنت','auth/operation-not-allowed':'تسجيل الدخول بالبريد غير مفعّل في Firebase','auth/user-disabled':'هذا الحساب معطّل','auth/unauthorized-domain':'هذا النطاق غير مضاف في Firebase (Authorized domains)','auth/api-key-not-valid.-please-pass-a-valid-api-key.':'مفتاح Firebase غير صالح','auth/invalid-api-key':'مفتاح Firebase غير صالح'};
+const AERR={'auth/email-already-in-use':'هذا البريد مسجّل مسبقاً، جرّب تسجيل الدخول','auth/invalid-email':'صيغة البريد الإلكتروني غير صحيحة','auth/weak-password':'كلمة المرور ضعيفة (6 أحرف على الأقل)','auth/user-not-found':'البريد أو كلمة المرور غير صحيحة','auth/wrong-password':'البريد أو كلمة المرور غير صحيحة','auth/invalid-credential':'البريد أو كلمة المرور غير صحيحة','auth/invalid-login-credentials':'البريد أو كلمة المرور غير صحيحة','auth/too-many-requests':'محاولات كثيرة، حاول بعد قليل','auth/network-request-failed':'تعذّر الاتصال بالإنترنت','auth/operation-not-allowed':'هذه الطريقة غير مفعّلة في Firebase (Authentication ثم Sign-in method)','auth/popup-blocked':'المتصفح منع نافذة Google، اسمح بالنوافذ المنبثقة','auth/user-disabled':'هذا الحساب معطّل','auth/unauthorized-domain':'هذا النطاق غير مضاف في Firebase (Authorized domains)','auth/api-key-not-valid.-please-pass-a-valid-api-key.':'مفتاح Firebase غير صالح','auth/invalid-api-key':'مفتاح Firebase غير صالح'};
 const aerr=t=>{$('#aerr').textContent=t||''};
 function authMode(m){
   AU.m=m;document.querySelectorAll('.aseg button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
@@ -862,6 +863,14 @@ $('#af').onsubmit=async e=>{
   catch(err){aerr(AERR[err&&err.code]||'حدث خطأ، حاول مرة أخرى')}
   AU.busy=false;$('#asub').disabled=false;
 };
+$('#agoogle').onclick=async()=>{
+  if(AU.busy)return;
+  if(!window.AUTH)return aerr('خدمة تسجيل الدخول لم تُحمَّل بعد، تحقق من الإنترنت');
+  AU.busy=true;aerr('');
+  try{const u=await AUTH.google();applyUser(u);toast('مرحباً '+(u.displayName||'بك'))}
+  catch(err){const c=err&&err.code;if(c!=='auth/popup-closed-by-user'&&c!=='auth/cancelled-popup-request')aerr(AERR[c]||'حدث خطأ، حاول مرة أخرى')}
+  AU.busy=false;
+};
 const authBoot=()=>AUTH.on(applyUser);
 if(!AOK)applyUser(null);
 else{
@@ -880,6 +889,7 @@ try{
   window.AUTH={
     async signup(n,e,p){const c=await A.createUserWithEmailAndPassword(auth,e,p);try{await A.updateProfile(c.user,{displayName:n})}catch(_){}return c.user},
     login:(e,p)=>A.signInWithEmailAndPassword(auth,e,p).then(c=>c.user),
+    google:()=>{const p=new A.GoogleAuthProvider();p.setCustomParameters({prompt:'select_account'});return A.signInWithPopup(auth,p).then(c=>c.user)},
     logout:()=>A.signOut(auth),
     on:cb=>A.onAuthStateChanged(auth,cb)
   };
