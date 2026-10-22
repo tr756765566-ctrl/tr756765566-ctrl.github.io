@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.fazza.majlis",
+    "sha256_cert_fingerprints": ["03:A4:E5:C5:23:2D:AF:56:BE:05:FA:74:C9:EB:D7:17:C2:FA:36:C5:F2:7E:54:BE:33:22:DF:D0:66:B1:9D:70"]
+  }
+}]
