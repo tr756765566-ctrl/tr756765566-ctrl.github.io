@@ -432,7 +432,16 @@ async function clPull(push=true){
     if(push&&(!r||(r.rv|0)<(P.rv|0))){if(!r)P.rv=(P.rv|0)+1;clCache();clCommit()}
     if(first)restore();
     return true;
-  }catch(e){CL.ok=false;return false}
+  }catch(e){CL.ok=false;CL.err=(e&&(e.code||e.message))||String(e);return false}
+}
+/* سبب تعذّر تحميل الحساب بكلمات مفهومة (يظهر للاعب/للمطوّر) */
+function clReason(){
+  const e=String(CL.err||'');
+  if(!navigator.onLine)return 'لا يوجد اتصال بالإنترنت';
+  if(window.DBERR)return 'تعذّر تحميل مكتبة قاعدة البيانات ('+String(window.DBERR.message||window.DBERR).slice(0,50)+')';
+  if(/permission/i.test(e))return 'قواعد Firebase (Rules) تمنع القراءة، انشرها من Realtime Database ثم Rules';
+  if(/timeout|offline/i.test(e))return 'لا استجابة من قاعدة بيانات Firebase، تأكد أنها منشأة وأن رابطها صحيح';
+  return 'خطأ: '+e.slice(0,60);
 }
 /* متابعة الحساب لحظياً (لو اشترى اللاعب من جهاز آخر يتحدّث الرصيد هنا) */
 function clWatch(){
@@ -449,7 +458,7 @@ async function clBind(u){
   CL.uid=u.uid;
   try{const c=JSON.parse(localStorage.getItem(clCk())||'null');if(c)P=clNorm(c)}catch(e){}
   clRefresh();
-  if(!await clPull()&&!CL.warned){CL.warned=true;toast('تعذّر تحميل رصيدك من حسابك، تحقق من الإنترنت')}
+  if(!await clPull()&&!CL.warned){CL.warned=true;toast('تعذّر تحميل رصيدك — '+clReason(),7000)}
   clearInterval(CL.iv);
   CL.iv=setInterval(()=>{if(CL.uid&&!CL.ok)clPull()},15000);
 }
@@ -462,7 +471,7 @@ function clUnbind(keep){
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&CL.t)clCommit()});
 addEventListener('online',()=>{if(CL.uid&&!CL.ok)clPull()});
 function updTop(){$('#co').textContent=P.co;$('#ge').textContent=P.ge;$('#sco').textContent=P.co;$('#sge').textContent=P.ge;if(!$('#lobby').hidden)lobbyView();$('#lv').textContent=1+Math.floor(P.xp/100);$('#xb').style.width=(P.xp%100)+'%';$('#xp').textContent=(P.xp%100)+'%'}
-function toast(s){const t=document.createElement('div');t.id='toast';t.textContent=s;document.body.appendChild(t);setTimeout(()=>t.remove(),1600)}
+function toast(s,ms){const t=document.createElement('div');t.id='toast';t.textContent=s;document.body.appendChild(t);setTimeout(()=>t.remove(),ms||1600)}
 $('#pc').onclick=()=>openShop('co');
 $('#pg').onclick=()=>openShop('ge');
 function toggleTheme(){const r=document.documentElement;r.dataset.theme=r.dataset.theme==='dark'?'light':'dark';toast('تم تغيير المظهر')}
@@ -755,7 +764,7 @@ async function clCredit(p,tk){
 async function buy(p){
   const s=await svc();
   if(!s){toast('الشراء يعمل فقط داخل تطبيق Google Play');return}
-  if(!CL.ok){toast('تعذّر الاتصال بحسابك. تحقق من الإنترنت ثم حاول مجدداً');return}
+  if(!CL.ok){toast('تعذّر الاتصال بحسابك — '+clReason(),7000);clPull();return}
   try{
     const r=await new PaymentRequest([{supportedMethods:gp,data:{sku:p.id}}],{total:{label:p.id,amount:{currency:'USD',value:'0'}}}).show();
     const tk=r.details.purchaseToken;
