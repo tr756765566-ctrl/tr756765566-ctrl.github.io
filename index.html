@@ -389,10 +389,78 @@ const $=s=>document.querySelector(s);
 const D={0:[],1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
 const half=n=>'<div class="h">'+[...Array(9)].map((_,i)=>'<i'+(D[n].includes(i)?' class="on"':'')+'></i>').join('')+'</div>';
 const tile=(t,c='',i='',st='')=>`<div class="t ${c}" data-i="${i}"${st?` style="${st}"`:''}>${half(t[0])}${half(t[1])}</div>`;
-let P={co:0,ge:0,xp:0,w:0,g:0,tk:[],own:[],eq:{},gi:{}};
-try{P=Object.assign(P,JSON.parse(localStorage.getItem('dom')||'{}'))}catch(e){}
-if(typeof P.ea!=='number')P.ea=P.w*50;
-const save=()=>{try{localStorage.setItem('dom',JSON.stringify(P))}catch(e){}};
+/* ===== الرصيد والتقدّم: محفوظ في حساب اللاعب (Firebase Realtime Database) مع نسخة احتياطية على الجهاز ===== */
+const P0=()=>({co:0,ge:0,xp:0,w:0,g:0,tk:[],own:[],eq:{},gi:{},rv:0});
+/* CL: حالة المزامنة. ok=تم تحميل الحساب من السحابة، ack=آخر نسخة مؤكَّدة في السحابة، sent=آخر نسخة أرسلناها */
+const CL={uid:null,ok:false,t:null,q:Promise.resolve(),sent:0,ack:0,un:null,iv:null,warned:false};
+const clArr=a=>Array.isArray(a)?a:(a&&typeof a==='object'?Object.values(a):[]);
+const clObj=o=>o&&typeof o==='object'&&!Array.isArray(o)?o:{};
+function clNorm(r){const x=Object.assign(P0(),r||{});x.tk=clArr(x.tk);x.own=clArr(x.own);x.eq=clObj(x.eq);x.gi=clObj(x.gi);if(typeof x.ea!=='number')x.ea=(x.w||0)*50;return x}
+let P=P0();
+const clCk=()=>'dom_'+CL.uid;
+const clCache=()=>{try{localStorage.setItem(clCk(),JSON.stringify(P))}catch(e){}};
+const clRefresh=()=>{applyEq();updTop()};
+/* كل تعديل على الرصيد يرفع رقم النسخة rv ثم يُرسل للسحابة بعد لحظات */
+const save=()=>{if(!CL.uid)return;P.rv=(P.rv|0)+1;clCache();clearTimeout(CL.t);CL.t=setTimeout(clCommit,700)};
+const clDbReady=()=>new Promise(res=>{if(window.DB||window.DBERR)return res();addEventListener('db-ready',()=>res(),{once:true});setTimeout(res,8000)});
+/* إرسال النسخة الحالية للسحابة (على دفعات متتالية). النتيجة true فقط إذا قبلها الخادم */
+function clCommit(){return CL.q=CL.q.then(clDo,clDo)}
+async function clDo(){
+  clearTimeout(CL.t);CL.t=null;
+  if(!CL.uid||!CL.ok||!window.DB)return false;
+  if((P.rv|0)<=CL.ack)return true;
+  const uid=CL.uid;
+  for(const k of ['co','ge','xp','w','g','ea'])if(!Number.isFinite(P[k]))P[k]=0;
+  const snap=JSON.parse(JSON.stringify(P));
+  CL.sent=Math.max(CL.sent,snap.rv|0);
+  try{await window.DB.save(uid,snap);if(uid===CL.uid)CL.ack=Math.max(CL.ack,snap.rv|0);return true}
+  catch(e){CL.sent=CL.ack;await clPull(false);return false}
+}
+/* قراءة الحساب من السحابة. النسخة الأحدث (الأعلى rv) هي المعتمدة */
+async function clPull(push=true){
+  if(!CL.uid)return false;
+  const uid=CL.uid;
+  try{
+    await clDbReady();
+    if(!window.DB)throw new Error('db');
+    const r=await window.DB.load(uid);
+    if(uid!==CL.uid)return false;
+    if(r&&(r.rv|0)>=(P.rv|0)){P=clNorm(r);clCache();clRefresh()}
+    CL.ack=r?(r.rv|0):0;CL.sent=Math.max(CL.sent,CL.ack);
+    const first=!CL.ok;CL.ok=true;
+    if(first)clWatch();
+    if(push&&(!r||(r.rv|0)<(P.rv|0))){if(!r)P.rv=(P.rv|0)+1;clCache();clCommit()}
+    if(first)restore();
+    return true;
+  }catch(e){CL.ok=false;return false}
+}
+/* متابعة الحساب لحظياً (لو اشترى اللاعب من جهاز آخر يتحدّث الرصيد هنا) */
+function clWatch(){
+  const uid=CL.uid;
+  if(CL.un||!window.DB||!window.DB.watch)return;
+  CL.un=window.DB.watch(uid,r=>{
+    if(!r||uid!==CL.uid)return;
+    if((r.rv|0)>CL.sent){P=clNorm(r);CL.sent=CL.ack=P.rv|0;clCache();clRefresh()}
+  })||(()=>{});
+}
+async function clBind(u){
+  if(CL.uid===u.uid)return;
+  clUnbind(true);
+  CL.uid=u.uid;
+  try{const c=JSON.parse(localStorage.getItem(clCk())||'null');if(c)P=clNorm(c)}catch(e){}
+  clRefresh();
+  if(!await clPull()&&!CL.warned){CL.warned=true;toast('تعذّر تحميل رصيدك من حسابك، تحقق من الإنترنت')}
+  clearInterval(CL.iv);
+  CL.iv=setInterval(()=>{if(CL.uid&&!CL.ok)clPull()},15000);
+}
+function clUnbind(keep){
+  clearTimeout(CL.t);CL.t=null;clearInterval(CL.iv);
+  if(CL.un){try{CL.un()}catch(e){}CL.un=null}
+  CL.uid=null;CL.ok=false;CL.sent=CL.ack=0;
+  P=P0();if(!keep)clRefresh();
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&CL.t)clCommit()});
+addEventListener('online',()=>{if(CL.uid&&!CL.ok)clPull()});
 function updTop(){$('#co').textContent=P.co;$('#ge').textContent=P.ge;$('#sco').textContent=P.co;$('#sge').textContent=P.ge;if(!$('#lobby').hidden)lobbyView();$('#lv').textContent=1+Math.floor(P.xp/100);$('#xb').style.width=(P.xp%100)+'%';$('#xp').textContent=(P.xp%100)+'%'}
 function toast(s){const t=document.createElement('div');t.id='toast';t.textContent=s;document.body.appendChild(t);setTimeout(()=>t.remove(),1600)}
 $('#pc').onclick=()=>openShop('co');
@@ -672,28 +740,38 @@ async function loadPrices(){
 $('#pks').onclick=e=>{const b=e.target.closest('.pk');if(b)buy(PK.find(p=>p.id===b.dataset.id))};
 $('#sc2').onclick=()=>{$('#shop').hidden=true};
 function grant(p,tk){
-  if(P.tk.includes(tk))return false;
   P.tk.push(tk);P.tk=P.tk.slice(-50);
-  P.co+=p.co?p.co+(p.bo||0):0;P.ge+=p.ge?p.ge+(p.bo||0):0;save();updTop();return true;
+  P.co+=p.co?p.co+(p.bo||0):0;P.ge+=p.ge?p.ge+(p.bo||0):0;save();updTop();
+}
+/* يضيف الرصيد ويتأكد أنه حُفظ في الحساب. النتيجة true فقط إذا صار الرصيد وعملية الشراء محفوظَين في السحابة */
+async function clCredit(p,tk){
+  for(let i=0;i<3;i++){
+    if(!CL.ok)return false;
+    if(!P.tk.includes(tk))grant(p,tk);
+    if(((P.rv|0)<=CL.ack||await clCommit())&&P.tk.includes(tk))return true;
+  }
+  return false;
 }
 async function buy(p){
   const s=await svc();
   if(!s){toast('الشراء يعمل فقط داخل تطبيق Google Play');return}
+  if(!CL.ok){toast('تعذّر الاتصال بحسابك. تحقق من الإنترنت ثم حاول مجدداً');return}
   try{
     const r=await new PaymentRequest([{supportedMethods:gp,data:{sku:p.id}}],{total:{label:p.id,amount:{currency:'USD',value:'0'}}}).show();
     const tk=r.details.purchaseToken;
     /* TODO: تحقّق من tk على خادمك (Google Play Developer API) قبل منح الرصيد */
     await r.complete('success');
-    grant(p,tk);await s.consume(tk);
-    toast('تمت عملية الشراء ✓');$('#shop').hidden=true;
-  }catch(e){if(e.name!=='AbortError')toast('تعذر إتمام الشراء')}
+    /* لا نستهلك عملية الشراء إلا بعد حفظ الرصيد في الحساب، وإلا تُسترجع عند الفتح القادم */
+    if(await clCredit(p,tk)){await s.consume(tk);toast('تمت عملية الشراء ✓');$('#shop').hidden=true}
+    else toast('تم الدفع، وسيُضاف الرصيد عند فتح اللعبة مع اتصال بالإنترنت');
+  }catch(e){if(e.name!=='AbortError')toast('تعذّر إتمام الشراء')}
 }
 async function restore(){
-  const s=await svc();if(!s)return;
+  const s=await svc();if(!s||!CL.ok)return;
   try{for(const x of await s.listPurchases()){
     const p=PK.find(k=>k.id===x.itemId);if(!p)continue;
-    const g=grant(p,x.purchaseToken);await s.consume(x.purchaseToken);
-    if(g)toast('تم استرجاع مشترياتك');
+    const had=P.tk.includes(x.purchaseToken);
+    if(await clCredit(p,x.purchaseToken)){await s.consume(x.purchaseToken);if(!had)toast('تم استرجاع مشترياتك')}
   }}catch(e){}
 }
 const ST={
@@ -854,8 +932,8 @@ function authMode(m){
 }
 function applyUser(u){
   const a=$('#auth');
-  if(u){document.querySelector('.prof b').textContent=u.displayName||(u.email||'').split('@')[0]||'لاعب';a.hidden=true}
-  else{a.hidden=false;a.classList.remove('ld','er');authMode('in');['#an','#ae','#ap'].forEach(i=>{$(i).value=''})}
+  if(u){document.querySelector('.prof b').textContent=u.displayName||(u.email||'').split('@')[0]||'لاعب';a.hidden=true;clBind(u)}
+  else{a.hidden=false;a.classList.remove('ld','er');authMode('in');['#an','#ae','#ap'].forEach(i=>{$(i).value=''});clUnbind()}
 }
 const AOK=/^https?:$/.test(location.protocol);
 function aFail(){
@@ -864,7 +942,7 @@ function aFail(){
   $('#aldm').textContent='تعذّر الاتصال بخدمة تسجيل الدخول. تحقق من الإنترنت.';
   $('#aretry').hidden=false;
 }
-async function authOut(){try{await AUTH.logout();tab('home')}catch(e){toast('تعذّر تسجيل الخروج')}}
+async function authOut(){try{await clCommit();await AUTH.logout();tab('home')}catch(e){toast('تعذّر تسجيل الخروج')}}
 lobbyFan('afan');
 document.querySelectorAll('.aseg button').forEach(b=>b.onclick=()=>authMode(b.dataset.m));
 $('#aeye').onclick=()=>{const p=$('#ap'),sh=p.type==='password';p.type=sh?'text':'password';$('#aeye').setAttribute('aria-label',sh?'إخفاء كلمة المرور':'إظهار كلمة المرور')};
@@ -895,7 +973,7 @@ else{
   if(window.AUTH)authBoot();else if(window.AUTHERR)aFail();else{addEventListener('fb-ready',authBoot,{once:true});addEventListener('fb-fail',aFail,{once:true})}
   setTimeout(aFail,8000);
 }
-applyEq();updTop();restore();
+applyEq();updTop();
 </script>
 <script type="module">
 /* Firebase Auth عبر CDN (بدون bundler) */
@@ -912,6 +990,19 @@ try{
     on:cb=>A.onAuthStateChanged(auth,cb)
   };
   dispatchEvent(new Event('fb-ready'));
+  /* قاعدة بيانات اللاعب: users/{uid}/p */
+  try{
+    const R=await import(V+'firebase-database.js');
+    const db=R.getDatabase(app);
+    const pr=u=>R.ref(db,'users/'+u+'/p');
+    const lim=(p,ms)=>Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms))]);
+    window.DB={
+      load:async u=>{const sn=await lim(R.get(pr(u)),10000);return sn.exists()?sn.val():null},
+      save:(u,d)=>lim(R.set(pr(u),d),10000),
+      watch:(u,cb)=>R.onValue(pr(u),sn=>cb(sn.exists()?sn.val():null),()=>{})
+    };
+  }catch(e){window.DBERR=e}
+  dispatchEvent(new Event('db-ready'));
 }catch(e){window.AUTHERR=e;dispatchEvent(new Event('fb-fail'))}
 </script>
 
